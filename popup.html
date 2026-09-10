@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Equation to Word</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup-card">
+      <header class="brand">
+        <img class="logo" src="assets/icon128.png" alt="Equation to Word">
+        <div>
+          <h1>Equation to Word</h1>
+          <p>ChatGPT helper</p>
+        </div>
+      </header>
+
+      <section class="status-card" aria-label="Status extension">
+        <span class="status-dot" aria-hidden="true"></span>
+        <strong>Siap digunakan</strong>
+        <span class="format-badge">UNICODEMATH</span>
+      </section>
+
+      <p class="description">
+        Klik equation yang diberi highlight pilihanmu di ChatGPT untuk menyalinnya ke Word.
+      </p>
+
+      <section class="color-settings" aria-label="Pengaturan warna highlight">
+        <div class="color-heading">
+          <strong>Warna highlight</strong>
+          <code id="colorValue">#3B82F6</code>
+        </div>
+        <div class="color-row">
+          <label class="color-picker" aria-label="Pilih warna highlight">
+            <input id="highlightColor" type="color" value="#3b82f6">
+            <span>Pilih warna</span>
+          </label>
+          <button id="saveColor" type="button">Simpan</button>
+        </div>
+        <p id="saveMessage" class="save-message" role="status" aria-live="polite"></p>
+      </section>
+
+      <button id="refreshScan" class="refresh-button" type="button">
+        <span class="refresh-icon" aria-hidden="true">↻</span>
+        Refresh equation
+      </button>
+      <p id="refreshMessage" class="refresh-message" role="status" aria-live="polite"></p>
+
+      <ol class="steps">
+        <li><span>1</span><div>Buka atau refresh ChatGPT</div></li>
+        <li><span>2</span><div>Temukan equation di jawaban</div></li>
+        <li><span>3</span><div>Klik equation untuk menyalin</div></li>
+      </ol>
+
+      <footer>v1.11.0 &nbsp;•&nbsp; Clipboard Chrome</footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
