@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Equation to Word",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Klik equation di ChatGPT untuk menyalin UnicodeMath ke Microsoft Word.",
   "icons": {
     "16": "assets/icon16.png",

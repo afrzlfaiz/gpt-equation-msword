@@ -7,6 +7,7 @@ Extension ini mendeteksi sumber LaTeX dari KaTeX/ChatGPT, memberi highlight pada
 ## Fitur
 
 - Klik equation untuk menyalin ke clipboard.
+- Seleksi lalu salin paragraf yang mengandung equation; delimiter `\(...\)`, `\[...\]`, dan `$$...$$` akan diformat otomatis.
 - Format equation otomatis untuk Word: delimiter dirapikan, `\frac12` menjadi `\frac{1}{2}`, subscript setelah panah diperbaiki, dan `\tag{...}` diubah menjadi `#(...)`.
 - Highlight equation dengan warna pilihan pengguna.
 - Popup toolbar dengan color picker dan tombol **Refresh equation**.

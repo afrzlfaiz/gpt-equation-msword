@@ -1,7 +1,13 @@
 (() => {
   "use strict";
 
-  const SELECTOR = "[data-math-source], .katex";
+  const SELECTOR = "[data-math-source], .katex, .MathJax, mjx-container, math";
+  const DELIMITED_MATH = /\\{1,2}\([\s\S]*?\\{1,2}\)|\\{1,2}\[[\s\S]*?\\{1,2}\]|\$\$[\s\S]*?\$\$|(?:^|[^\\])\$[^$\n]+\$/;
+  const BLOCK_TAGS = new Set([
+    "ADDRESS", "ARTICLE", "BLOCKQUOTE", "DIV", "DL", "FIELDSET", "FIGURE",
+    "FOOTER", "FORM", "H1", "H2", "H3", "H4", "H5", "H6", "HEADER",
+    "HR", "LI", "OL", "P", "PRE", "SECTION", "TABLE", "TD", "TH", "TR", "UL"
+  ]);
   const EQUATION_CLASS = "tm-click-copy-unicode";
   const COPIED_CLASS = "tm-unicode-copied";
   const DEFAULT_HIGHLIGHT = "#3b82f6";
@@ -9,18 +15,23 @@
 
   const readSource = (element) =>
     element.getAttribute("data-math-source") ||
-    element.querySelector('annotation[encoding="application/x-tex"]')?.textContent ||
+    element.querySelector(
+      'annotation[encoding="application/x-tex"], annotation[encoding="LaTeX"]'
+    )?.textContent ||
     "";
 
   const formatUnicode = (source) => {
     let mathText = source
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
       .trim()
       .replace(/^\$\$([\s\S]*)\$\$$/, "$1")
       .replace(/^\\\[([\s\S]*)\\\]$/, "$1")
+      .replace(/^\\\(([\s\S]*)\\\)$/, "$1")
       .replace(/^\$([\s\S]*)\$$/, "$1")
       .trim()
       .replace(/\s*\n\s*/g, " ")
-      .replace(/\\frac\s*(\d)\s*(\d)/g, "\\frac{$1}{$2}");
+      .replace(/\\frac\s*(\d)\s*(\d)/g, "\\frac{$1}{$2}")
+      .replace(/\\_/g, "_");
 
     mathText = mathText.replace(
       /\\(overrightarrow|overleftarrow)\s*\{([^}]+)\}\s*_(\{[^}]+\}|[a-zA-Z0-9]+)/g,
@@ -57,6 +68,45 @@
     setTimeout(() => host.classList.remove(COPIED_CLASS), 1200);
   };
 
+  let toastTimeout;
+  const showCopiedToast = () => {
+    let toast = document.getElementById("tm-unicode-copy-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "tm-unicode-copy-toast";
+      toast.textContent = "Copied!";
+      document.body.appendChild(toast);
+    }
+
+    clearTimeout(toastTimeout);
+    toast.classList.add("tm-visible");
+    toastTimeout = setTimeout(() => toast.classList.remove("tm-visible"), 1400);
+  };
+
+  const copyWithTextarea = (text) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.readOnly = true;
+    textarea.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0;";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    } finally {
+      textarea.remove();
+    }
+    return copied;
+  };
+
+  const copyText = async (text) => {
+    if (copyWithTextarea(text)) return;
+    await navigator.clipboard.writeText(text);
+  };
+
   const handleClick = (event) => {
     const target = event.target instanceof Element
       ? event.target.closest(SELECTOR)
@@ -72,9 +122,83 @@
     const unicodeMath = formatUnicode(readSource(host));
     if (!unicodeMath || unicodeMath === "$$") return;
 
-    navigator.clipboard.writeText(unicodeMath)
-      .then(() => showCopied(host))
+    copyText(unicodeMath)
+      .then(() => {
+        showCopied(host);
+        showCopiedToast();
+      })
       .catch((error) => console.error("Gagal menyalin equation:", error));
+  };
+
+  const isEditable = (node) => {
+    const element = node instanceof Element ? node : node?.parentElement;
+    return Boolean(element?.closest("input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']"));
+  };
+
+  const serializeClipboardNode = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || "";
+    if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
+      return "";
+    }
+
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.tagName === "BR") return "\n";
+
+      if (node.matches(SELECTOR)) {
+        const source = readSource(node);
+        if (source) return formatUnicode(source);
+      }
+    }
+
+    const content = [...node.childNodes].map(serializeClipboardNode).join("");
+    return node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName)
+      ? content + "\n"
+      : content;
+  };
+
+  const normalizeCopiedText = (text) =>
+    text
+      .replace(/\u00A0/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n[ \t]+/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+  const formatDelimitedMath = (text) => text
+    .replace(/\\{1,2}\[([\s\S]*?)\\{1,2}\]/g, (_, source) => formatUnicode(source))
+    .replace(/\\{1,2}\(([\s\S]*?)\\{1,2}\)/g, (_, source) => formatUnicode(source))
+    .replace(/\$\$([\s\S]*?)\$\$/g, (_, source) => formatUnicode(source))
+    .replace(/\$([^$\n]+)\$/g, (_, source) => formatUnicode(source));
+
+  const escapeHtml = (text) => text.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[character]));
+
+  const handleCopy = (event) => {
+    if (!event.clipboardData) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || isEditable(selection.anchorNode)) return;
+
+    const rawText = selection.toString();
+    const fragment = selection.getRangeAt(0).cloneContents();
+    const hasRenderedMath = [...fragment.querySelectorAll(SELECTOR)].some((node) => readSource(node));
+    if (!hasRenderedMath && !DELIMITED_MATH.test(rawText)) return;
+
+    const copiedText = formatDelimitedMath(
+      normalizeCopiedText(serializeClipboardNode(fragment) || rawText)
+    );
+    if (!copiedText) return;
+
+    event.clipboardData.setData("text/plain", copiedText);
+    event.clipboardData.setData("text/html", escapeHtml(copiedText).replace(/\n/g, "<br>"));
+    event.preventDefault();
+    event.stopPropagation();
+    showCopiedToast();
   };
 
   const markElement = (element) => {
@@ -141,6 +265,30 @@
       animation: tm-fade-in-up 0.2s ease-out forwards;
     }
 
+    #tm-unicode-copy-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 2147483647;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: var(--tm-highlight, #3b82f6);
+      color: white;
+      font: 700 12px/1.2 sans-serif;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translate(-50%, 8px);
+      transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
+    }
+
+    #tm-unicode-copy-toast.tm-visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
+
     @keyframes tm-fade-in-up {
       from { opacity: 0; transform: translate(-50%, 5px); }
       to { opacity: 1; transform: translate(-50%, 0); }
@@ -162,6 +310,7 @@
   }
 
   document.addEventListener("click", handleClick, true);
+  document.addEventListener("copy", handleCopy, true);
   scan(document.body);
 
   let scanTimeout;
